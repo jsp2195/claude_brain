@@ -1,0 +1,30 @@
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md"]
+
+[features]
+multi_agent = true
+
+[agents]
+max_threads = 5
+max_depth = 1
+
+[agents.coordinator]
+description = "Route and coordinate lean agent-team execution."
+config_file = "agents/coordinator.toml"
+
+[agents.planner]
+description = "Plan scoped tasks and ownership without edits."
+config_file = "agents/planner.toml"
+
+[agents.implementer]
+description = "Implement smallest viable diff in owned files."
+config_file = "agents/implementer.toml"
+
+[agents.debugger]
+description = "Diagnose root cause for failing behavior."
+config_file = "agents/debugger.toml"
+
+[agents.verifier]
+description = "Independently verify and report evidence."
+config_file = "agents/verifier.toml"
