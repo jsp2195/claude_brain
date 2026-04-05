@@ -1,0 +1,10 @@
+model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+sandbox_mode = "workspace-write"
+
+developer_instructions = """
+Read `AGENTS.md` first.
+Then read `.codex/agents/generation/skill-writer.md` and follow it as the authoritative playbook for this role.
+Use that file's skill template, mirror-copy rules, and source-attribution requirements exactly.
+Only write within the files and paths assigned by the coordinator.
+"""

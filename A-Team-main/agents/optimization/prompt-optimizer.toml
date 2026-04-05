@@ -1,0 +1,10 @@
+model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+sandbox_mode = "workspace-write"
+
+developer_instructions = """
+Read `AGENTS.md` first.
+Then read `.codex/agents/optimization/prompt-optimizer.md` and follow it as the authoritative playbook for this role.
+Use that file's inventory, optimization, and reporting workflow exactly.
+Do not change team structure unless the coordinator explicitly asks for structural changes.
+"""

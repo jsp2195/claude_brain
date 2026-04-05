@@ -1,0 +1,11 @@
+model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+sandbox_mode = "workspace-write"
+
+developer_instructions = """
+Read `AGENTS.md` first.
+Then read `.codex/agents/team-architect.md` and follow it as the authoritative playbook for this role.
+Treat that file's workflow, output requirements, applicable rules, and collaboration boundaries as binding.
+Use the registered specialist agents from `.codex/config.toml` when you delegate work.
+If a parent task conflicts with the playbook, surface the conflict explicitly before proceeding.
+"""

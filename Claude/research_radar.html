@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research Radar</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:           #0d1117;
+    --surface:      #161b22;
+    --border:       #30363d;
+    --text-primary: #e6edf3;
+    --text-muted:   #8b949e;
+    --accent-blue:  #58a6ff;
+    --accent-green: #3fb950;
+    --accent-orange:#f0883e;
+    --accent-purple:#bc8cff;
+    --accent-teal:  #39d353;
+    --domain-ml:    #58a6ff;
+    --domain-mech:  #f0883e;
+    --domain-mat:   #3fb950;
+    --domain-multi: #bc8cff;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+  }
+
+  header .meta {
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* Left sidebar */
+  .sidebar-left {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .filter-section h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .project-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    padding: 3px 0;
+  }
+
+  .project-checkbox-row:hover { opacity: 0.85; }
+
+  .domain-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .project-checkbox-row input[type="checkbox"] {
+    accent-color: var(--accent-blue);
+    cursor: pointer;
+  }
+
+  .project-checkbox-row label {
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+
+  .year-range-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .year-range-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .year-range-row label {
+    font-size: 12px;
+    color: var(--text-muted);
+    width: 30px;
+  }
+
+  .year-range-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent-blue);
+  }
+
+  .year-display {
+    font-size: 12px;
+    color: var(--text-primary);
+    text-align: center;
+  }
+
+  .domain-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .domain-btn {
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .domain-btn.active-ml    { background: var(--domain-ml);   color: #0d1117; border-color: var(--domain-ml); }
+  .domain-btn.active-mechanics { background: var(--domain-mech); color: #0d1117; border-color: var(--domain-mech); }
+  .domain-btn.active-materials { background: var(--domain-mat);  color: #0d1117; border-color: var(--domain-mat); }
+  .domain-btn.active-multi  { background: var(--domain-multi); color: #0d1117; border-color: var(--domain-multi); }
+  .domain-btn:hover { opacity: 0.8; }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+  }
+
+  .toggle-row label { font-size: 12px; color: var(--text-primary); cursor: pointer; }
+  .toggle-row input[type="checkbox"] { accent-color: var(--accent-teal); cursor: pointer; }
+
+  .reset-btn {
+    width: 100%;
+    padding: 7px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .reset-btn:hover { background: var(--border); color: var(--text-primary); }
+
+  /* Center graph area */
+  .graph-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    min-width: 0;
+  }
+
+  #graph-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 11px;
+    font-size: 12px;
+    color: var(--text-primary);
+    pointer-events: none;
+    opacity: 0;
+    max-width: 260px;
+    line-height: 1.5;
+    z-index: 100;
+    transition: opacity 0.1s;
+  }
+
+  /* Right sidebar */
+  .sidebar-right {
+    width: 320px;
+    min-width: 320px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-right-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .paper-count-badge {
+    background: var(--border);
+    border-radius: 10px;
+    padding: 2px 7px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .paper-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+  }
+
+  .paper-item {
+    padding: 9px 14px;
+    border-bottom: 1px solid #1c2128;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .paper-item:hover { background: rgba(48,54,61,0.5); }
+  .paper-item.highlighted { background: rgba(88,166,255,0.08); border-left: 2px solid var(--accent-blue); }
+
+  .paper-item-title {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.35;
+    margin-bottom: 5px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .paper-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .year-badge {
+    background: var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .cite-badge {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .bridge-tag {
+    font-size: 10px;
+    color: var(--accent-teal);
+    border: 1px solid var(--accent-teal);
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+
+  .relevance-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 5px;
+  }
+
+  .relevance-bar-bg {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .relevance-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  .relevance-val {
+    font-size: 10px;
+    color: var(--text-muted);
+    width: 28px;
+    text-align: right;
+  }
+
+  .proj-tag {
+    font-size: 10px;
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+
+  /* Detail panel */
+  #detail-panel {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 14px 20px;
+    flex-shrink: 0;
+    display: none;
+    position: relative;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+
+  #detail-panel.visible { display: block; }
+
+  #detail-close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 6px;
+  }
+
+  #detail-close:hover { color: var(--text-primary); }
+
+  #detail-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    padding-right: 30px;
+    line-height: 1.4;
+  }
+
+  #detail-authors {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  #detail-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  #detail-abstract {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+
+  #detail-footer {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  #detail-link {
+    font-size: 12px;
+    color: var(--accent-blue);
+    text-decoration: none;
+  }
+
+  #detail-link:hover { text-decoration: underline; }
+
+  .detail-proj-chip {
+    font-size: 11px;
+    border-radius: 4px;
+    padding: 2px 7px;
+    border: 1px solid;
+    font-weight: 500;
+  }
+
+  /* SVG styles */
+  .link-line {
+    stroke-opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .node-circle {
+    cursor: pointer;
+  }
+
+  .project-label {
+    pointer-events: none;
+    font-size: 11px;
+    font-weight: 600;
+    fill: #fff;
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+
+  .glow-filter { overflow: visible; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Research Radar</h1>
+  <span class="meta" id="header-meta">Loading...</span>
+</header>
+
+<div class="main-layout">
+
+  <!-- Left sidebar: filters -->
+  <aside class="sidebar-left">
+
+    <div class="filter-section">
+      <h3>Projects</h3>
+      <div id="project-checkboxes"></div>
+    </div>
+
+    <div class="filter-section">
+      <h3>Year Range</h3>
+      <div class="year-range-wrap">
+        <div class="year-range-row">
+          <label>From</label>
+          <input type="range" id="year-min" min="2024" max="2026" value="2024" step="1">
+        </div>
+        <div class="year-range-row">
+          <label>To</label>
+          <input type="range" id="year-max" min="2024" max="2026" value="2026" step="1">
+        </div>
+        <div class="year-display" id="year-display">2024 – 2026</div>
+      </div>
+    </div>
+
+    <div class="filter-section">
+      <h3>Domain</h3>
+      <div class="domain-buttons">
+        <button class="domain-btn" data-domain="ml">ML</button>
+        <button class="domain-btn" data-domain="mechanics">Mechanics</button>
+        <button class="domain-btn" data-domain="materials">Materials</button>
+        <button class="domain-btn" data-domain="multi">Multi</button>
+      </div>
+    </div>
+
+    <div class="filter-section">
+      <div class="toggle-row">
+        <input type="checkbox" id="bridge-only">
+        <label for="bridge-only">Bridge papers only</label>
+      </div>
+    </div>
+
+    <button class="reset-btn" id="reset-btn">Reset filters</button>
+
+  </aside>
+
+  <!-- Center: D3 graph -->
+  <div class="graph-area">
+    <svg id="graph-svg"></svg>
+    <div id="tooltip"></div>
+  </div>
+
+  <!-- Right sidebar: ranked paper list -->
+  <aside class="sidebar-right">
+    <div class="sidebar-right-header">
+      Papers by Relevance
+      <span class="paper-count-badge" id="paper-count-badge">0</span>
+    </div>
+    <div class="paper-list" id="paper-list"></div>
+  </aside>
+
+</div>
+
+<!-- Bottom detail panel -->
+<div id="detail-panel">
+  <button id="detail-close" title="Close">&times;</button>
+  <div id="detail-title"></div>
+  <div id="detail-authors"></div>
+  <div id="detail-meta"></div>
+  <div id="detail-abstract"></div>
+  <div id="detail-footer"></div>
+</div>
+
+<script>
+const DATA = {"projects":[{"id":"proj_0","name":"Audio Engineering / Hearing Technology Project","short_name":"Audio Engineering / Hearing","domain":"ml","overview":"Research and engineering workstream around audio, hearing augmentation, and machine learning. Signal processing, inference, and intelligent systems for hearing-related tasks rather than conventional materials modeling.","keywords":["hearing augmentation","audio","engineering","technology","project"]},{"id":"proj_1","name":"CMT Multi-Agent Traffic Flow Project","short_name":"CMT Multi-Agent Traffic Flow","domain":"ml","overview":"Multi-agent modeling of traffic flow using structured CMT traffic data. Use agent-based or multi-agent methods to understand, simulate, or predict traffic behavior in a principled way.","keywords":["multi-agent traffic","traffic flow","project","multi-agent","traffic"]},{"id":"proj_2","name":"Coarse-to-Fine Generative Modeling of PBX Microstructures","short_name":"Coarse-to-Fine Generative Modeling PBX","domain":"multi","overview":"Graph- and diffusion-based generative modeling for polymer-bonded explosive microstructures. Condition on a coarse particle assembly and generate finer particle structure that is physically plausible, mechanically meaningful, and useful for downstream simulation. Includes correcting CT segmentation bias by reconstructing fine-particle structure missing or under-resolved in CT-derived PBX data.","keywords":["generative model","conditional generation","pbx microstructure","polymer-bonded explosive","particle assembly","ct segmentation","coarse-to-fine","modeling"]},{"id":"proj_3","name":"GENESIS Proposal — AI-Driven Materials Discovery","short_name":"GENESIS Proposal — AI-Driven","domain":"multi","overview":"Proposal development around AI for materials discovery and design. Centered on linking microstructure and mechanical behavior through coupled latent models, uncertainty-aware representation learning, and generative methods for heterogeneous materials. PBX is the motivating system, but the framing is broader: AI systems that can represent, predict, and design materials with targeted functionality.","keywords":["representation learning","uncertainty quantification","multi-fidelity","genesis","proposal","ai-driven","materials","discovery"]},{"id":"proj_4","name":"Graph Autoencoder for Latent Compression of PBX Microstructures","short_name":"Graph Autoencoder Latent Compression","domain":"multi","overview":"Graph autoencoder project focused on learning compact latent representations of PBX microstructure. Encode the topology and geometry of heterogeneous particle assemblies into a latent space useful for downstream analysis, generation, and potentially microstructure-to-response modeling.","keywords":["graph autoencoder","latent representation","pbx microstructure","compression","microstructures"]},{"id":"proj_5","name":"Microstructure-to-Response Modeling for Heterogeneous Materials","short_name":"Microstructure-to-Response Modeling Heterogeneous Materials","domain":"multi","overview":"Broader research direction focused on learning the relationship between material microstructure and mechanical response. Connect representation learning and generative modeling to constitutive behavior, response prediction, and eventually inverse design.","keywords":["generative model","latent representation","representation learning","microstructure-to-response","modeling","heterogeneous","materials"]},{"id":"proj_6","name":"PyUMAT Johnson-Cook with Lode Angle","short_name":"PyUMAT Johnson-Cook Lode Angle","domain":"mechanics","overview":"Constitutive modeling project involving a PyUMAT implementation of Johnson-Cook-type plasticity extended or modified to account for Lode angle effects. Capture more realistic dependence of material response on stress-state geometry.","keywords":["constitutive model","johnson-cook","lode angle","plasticity","pyumat","with"]},{"id":"proj_7","name":"Yield Surface Reconstruction","short_name":"Yield Surface Reconstruction","domain":"mechanics","overview":"Reconstructing or learning yield surfaces from data, simulations, or constitutive structure. Represent complex material response surfaces in a way that is physically meaningful and useful for downstream modeling and analysis.","keywords":["constitutive model","yield surface","yield surface reconstruction","yield","surface"]}],"papers":[{"id":"b8f47add3f110e8c4c47f2e61f1fa3ca6d5781a0","title":"Johnson–Cook yield functions for cyclotetramethylene-tetranitramine (HMX) and cyclotrimethylene-trinitramine (RDX) derived from single crystal plasticity models","authors":["Sen, O.","Seshadri, P.","Rai, N.","Larentzos, J.","et al."],"year":2024,"abstract_snippet":"High-fidelity constitutive models are critical for accurate meso-scale continuum modeling and prediction of shock initiation of crystalline energetic materials (EMs). While empirically calibrated or atomistic-guided anisotropic elastoplastic models of EM such as cyclotetramethylene-tetranitramine (H","citation_count":12,"url":"https://www.semanticscholar.org/paper/b8f47add3f110e8c4c47f2e61f1fa3ca6d5781a0","domain":"multi","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.188},{"id":"0b850b6b5cc7feb1bd9867109c2150510eeccb66","title":"Resilient machine learning for steel surface defect detection based on lightweight convolution","authors":["Liu, L.","Zhang, Y.","Karimi, H."],"year":2024,"abstract_snippet":"Steel, as a crucial material extensively used in various fields, has a critical impact on the determination of the stability and reliability of engineering structures. Nevertheless, because of inevitable factors in manufacturing, transportation, and other processes, steel may exhibit various surface","citation_count":19,"url":"https://www.semanticscholar.org/paper/0b850b6b5cc7feb1bd9867109c2150510eeccb66","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.2175},{"id":"f5959d225a0d8a80f67086115bd105869b6aa2a1","title":"Stabilizing Ru in Multicomponent Alloy as Acidic Oxygen Evolution Catalysts with Machine Learning-Enabled Structural Insights and Screening.","authors":["Maulana, A.","Han, S.","Shan, Y.","Chen, P.","et al."],"year":2025,"abstract_snippet":"Developing active, stable, and cost-effective acidic oxygen evolution reaction (OER) catalyst is a critical challenge in realizing large-scale hydrogen (H2) production via electrochemical water splitting. Utilizing highly active and relatively inexpensive Ru is generally challenged by its long-term ","citation_count":36,"url":"https://www.semanticscholar.org/paper/f5959d225a0d8a80f67086115bd105869b6aa2a1","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.3891},{"id":"a01740e18154f49a4e887683efa0ebbf6e357b91","title":"A Spatiotemporal Graph Neural Network with Graph Adaptive and Attention Mechanisms for Traffic Flow Prediction","authors":["Huo, Y.","Zhang, H.","Tian, Y.","Wang, Z.","et al."],"year":2024,"abstract_snippet":"This study addresses the complex challenges associated with road traffic flow prediction and congestion management through the enhancement of the attention-based spatiotemporal graph convolutional network (ASTGCN) algorithm. Leveraging toll data and real-time traffic flow information from Orange Cou","citation_count":15,"url":"https://www.semanticscholar.org/paper/a01740e18154f49a4e887683efa0ebbf6e357b91","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2007},{"id":"685672211d8e8ea4f27fe14adaa8ff52ebb6356c","title":"Response surface methodology and artificial neural network based media optimization for pullulan production in Aureobasidium pullulans.","authors":["Sahu, N.","Mahanty, B.","Haldar, D."],"year":2024,"abstract_snippet":"The selection and optimization of carbon and nitrogen sources are essential for enhancing pullulan production in Aureobasidium pullulans. In this study, combinations of carbon (sucrose, fructose, glucose) and nitrogen sources ((NH4)2SO4, urea, NaNO3) were screened, where sucrose and NaNO3 offered th","citation_count":11,"url":"https://www.semanticscholar.org/paper/685672211d8e8ea4f27fe14adaa8ff52ebb6356c","domain":"multi","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.1838},{"id":"40060ad3934a13184367785de01af16b4cff97cb","title":"An efficient intelligent transportation system for traffic flow prediction using meta-temporal hyperbolic quantum graph neural networks","authors":["Rajagopal, M.","Sivasakthivel, R.","Anitha, G.","Arunachalam, K.","et al."],"year":2025,"abstract_snippet":"Intelligent Transportation Systems (ITS) necessitate scalable, real-time, and adaptive traffic flow prediction models to enhance urban mobility and alleviate congestion. Conventional Graph Neural Network methodologies encounter difficulties in managing extensive road networks, long-range temporal re","citation_count":5,"url":"https://www.semanticscholar.org/paper/40060ad3934a13184367785de01af16b4cff97cb","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2586},{"id":"cccac9b1cbe5d454e89cef3d74a402a201de9afb","title":"How Does Deep Neural Network-Based Noise Reduction in Hearing Aids Impact Cochlear Implant Candidacy?","authors":["Saoji, A.","Sheikh, B.","Bertsch, N.","Goulson, K.","et al."],"year":2024,"abstract_snippet":"Background/Objectives: Adult hearing-impaired patients qualifying for cochlear implants typically exhibit less than 60% sentence recognition under the best hearing aid conditions, either in quiet or noisy environments, with speech and noise presented through a single speaker. This study examines the","citation_count":4,"url":"https://www.semanticscholar.org/paper/cccac9b1cbe5d454e89cef3d74a402a201de9afb","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.1543},{"id":"a40f49e895fb5b82ddef4db51b122d0b02304b19","title":"Correction physics-informed neural network-aided matched field processing technique for underwater passive source range estimation.","authors":["Miao, H.","Li, L.","Zhang, Y.","Cao, R.","et al."],"year":2025,"abstract_snippet":"Matched field processing (MFP), a technique that is extensively used for underwater passive source ranging, primarily faces a challenge of replica environmental mismatch. In this paper, a correction physics-informed neural network (CrPINN)-aided MFP (CrPIMFP), a data-efficient and physics-conforming","citation_count":3,"url":"https://www.semanticscholar.org/paper/a40f49e895fb5b82ddef4db51b122d0b02304b19","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.2501},{"id":"e8d4f3a98dc868002a8fe82ac376321120eb962b","title":"Widely Employed Constitutive Material Models in Abaqus FEA Software Suite for Simulations of Structures and Their Materials: A Brief Review","authors":["Anas, S.","Tahzeeb, R.","Al-Dala’ien, R.","Alam, M.","et al."],"year":2024,"abstract_snippet":"The structural response of masonry/concrete structures depends upon the load-carrying mechanism and subsequently deformations produced by loads carried. In masonry/concrete structures, identification of the stress/strain imposing stress conditions and strain hardening/softening makes the structural ","citation_count":6,"url":"https://www.semanticscholar.org/paper/e8d4f3a98dc868002a8fe82ac376321120eb962b","domain":"mechanics","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.1628},{"id":"47c33933ccbea8fc3bdbe50ad277545dd696c3b1","title":"Yield prediction in a peanut breeding program using remote sensing data and machine learning algorithms","authors":["Pugh, N.","Young, A.","Ojha, M.","Emendack, Y.","et al."],"year":2024,"abstract_snippet":"Peanut is a critical food crop worldwide, and the development of high-throughput phenotyping techniques is essential for enhancing the crop’s genetic gain rate. Given the obvious challenges of directly estimating peanut yields through remote sensing, an approach that utilizes above-ground phenotypes","citation_count":14,"url":"https://www.semanticscholar.org/paper/47c33933ccbea8fc3bdbe50ad277545dd696c3b1","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.1964},{"id":"ac940405d0766df0675a81160b16ac8cd496f89e","title":"Understanding the Photoinduced Desorption and Oxidation of CO on Ru(0001) Using a Neural Network Potential Energy Surface","authors":["Žugec, I.","Tetenoire, A.","Muzas, A.","Zhang, Y.","et al."],"year":2024,"abstract_snippet":"The study of ultrafast photoinduced dynamics of adsorbates on metal surfaces requires thorough investigation of laser-excited electrons and, in many cases, the highly excited surface lattice. While ab initio molecular dynamics with electronic friction and thermostats (Te, Tl)-AIMDEF addresses such c","citation_count":13,"url":"https://www.semanticscholar.org/paper/ac940405d0766df0675a81160b16ac8cd496f89e","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.1922},{"id":"6ffd01617fb511d0314a5dfda862a77653054962","title":"A Resource-Aware Multi-Graph Neural Network for Urban Traffic Flow Prediction in Multi-Access Edge Computing Systems","authors":["Ali, A.","Ullah, I.","Shabaz, M.","Sharafian, A.","et al."],"year":2024,"abstract_snippet":"Predicting traffic is the main duty of an intelligent transportation system (ITS). Precise traffic forecasts can significantly enhance the use of public funds. However, the dynamic and complex nature of spatio-temporal relationships presents significant challenges. Most current methods utilize stati","citation_count":95,"url":"https://www.semanticscholar.org/paper/6ffd01617fb511d0314a5dfda862a77653054962","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.5375},{"id":"26d3a19e5874b8d146143aacba73ccf446db8830","title":"Research on Urban Road Traffic Flow Prediction Based on Sa-Dynamic Graph Convolutional Neural Network","authors":["Hu, S.","Gu, J.","Li, S."],"year":2025,"abstract_snippet":"Neural network models based on GNNs often achieve good results in traffic flow prediction tasks of traffic networks. However, most existing GNN-based methods apply a fixed graph structure to capture spatial dependencies between nodes, and fixed graph structures may not be able to reflect the spatiot","citation_count":3,"url":"https://www.semanticscholar.org/paper/26d3a19e5874b8d146143aacba73ccf446db8830","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2501},{"id":"1c33bf160603e9a4c009aeb7450b5125b05861d6","title":"Parameter identification of Johnson–Cook constitutive model based on genetic algorithm and simulation analysis for 304 stainless steel","authors":["Jiang, X.","Ding, J.","Wang, C.","Shiju, E.","et al."],"year":2024,"abstract_snippet":"Addressing the significant discrepancy between actual experimental cutting force and its predicted values derived from traditional constitutive model parameter identification methods, a reverse identification research of the Johnson–Cook (J-C) constitutive model for 304 stainless steel was conducted","citation_count":7,"url":"https://www.semanticscholar.org/paper/1c33bf160603e9a4c009aeb7450b5125b05861d6","domain":"multi","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.167},{"id":"f8a04899540fdaca335896b5409f1f8b44d32bc6","title":"Study on Warpage of Flip Chip Structure Based on Finite Element Analysis and Machine Learning Algorithm","authors":["Zhang, Q.","Zhong, C.","Rong, S."],"year":2024,"abstract_snippet":"Warpage has always been a challenge in package, large value of warpage will lead to a series of problems such as delamination, crack et al. Finite element analysis (FEA) has been widely used in package, because of its comprehensive theory, diverse methods, convenient modification and low cost. Meanw","citation_count":5,"url":"https://www.semanticscholar.org/paper/f8a04899540fdaca335896b5409f1f8b44d32bc6","domain":"multi","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.1586},{"id":"b1eb3ab0010664084e811bfe48d2f6f5cd8ba8f6","title":"Traffic Flow Prediction Optimization Model Based on Convolutional Neural Network of Time-Domain Graph","authors":["Yang, M."],"year":2024,"abstract_snippet":"Urban traffic flow prediction is an important part of building a green, low-carbon, safe and efficient intelligent transportation system. Spatiotemporal graph neural networks are widely used in urban traffic flow prediction due to their strong spatiotemporal data representation capabilities. However","citation_count":3,"url":"https://www.semanticscholar.org/paper/b1eb3ab0010664084e811bfe48d2f6f5cd8ba8f6","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.1501},{"id":"5efd6cdb8d12554a0f1f5d4892ce629e2ce8248f","title":"Neural-WDRC: A Deep Learning Wide Dynamic Range Compression Method Combined With Controllable Noise Reduction for Hearing Aids","authors":["Zhang, H.","Moore, B.","Jiang, F.","Diao, M.","et al."],"year":2025,"abstract_snippet":"Wide dynamic range compression (WDRC) and noise reduction both play important roles in hearing aids. WDRC provides level-dependent amplification so that the level of sound produced by the hearing aid falls between the hearing threshold and the highest comfortable level of the listener, while noise r","citation_count":5,"url":"https://www.semanticscholar.org/paper/5efd6cdb8d12554a0f1f5d4892ce629e2ce8248f","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.2586},{"id":"bb0d5802a5b41281b0cf53e649ad64565b854db2","title":"AST-GNNFormer: Adaptive Spatio-Temporal Graph Neural Network with Layer-Aware Preservation for Traffic Flow Prediction","authors":["Zheng, Y.","Jin, X."],"year":2025,"abstract_snippet":"Abstract Accurate traffic flow prediction plays a critical role in intelligent transportation systems, providing essential support for urban planning, traffic control, and congestion mitigation. To address the challenges of spatial heterogeneity and temporal dynamics inherent in traffic data, this p","citation_count":1,"url":"https://www.semanticscholar.org/paper/bb0d5802a5b41281b0cf53e649ad64565b854db2","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2417},{"id":"53dae2d46c6a5a368fc37aacf3733fa4a37f1d11","title":"Preliminary results of classifying otosclerosis and disarticulation using a convolutional neural network trained with simulated wideband acoustic immittance data","authors":["Lauxmann, M.","Viehl, F.","Priwitzer, B.","Sackmann, B."],"year":2024,"abstract_snippet":"Current noninvasive methods of clinical practice often do not identify the causes of conductive hearing loss due to pathologic changes in the middle ear with sufficient certainty. Wideband acoustic immittance (WAI) measurement is noninvasive, inexpensive and objective. It is very sensitive to pathol","citation_count":2,"url":"https://www.semanticscholar.org/paper/53dae2d46c6a5a368fc37aacf3733fa4a37f1d11","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.1459},{"id":"0bfeaf3e75de25afb70aa87726a2687a9bdf2f14","title":"Gated Fusion Adaptive Graph Neural Network for Urban Road Traffic Flow Prediction","authors":["Xiong, L.","Yuan, X.","Hu, Z.","Huang, X.","et al."],"year":2024,"abstract_snippet":"Accurate prediction of traffic flow plays an important role in maintaining traffic order and traffic safety, which is a key task in the application of intelligent transportation systems (ITS). However, the urban road network has complex dynamic spatial correlation and nonlinear temporal correlation,","citation_count":27,"url":"https://www.semanticscholar.org/paper/0bfeaf3e75de25afb70aa87726a2687a9bdf2f14","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2512},{"id":"0888112020982b556791b550e51c80c052258361","title":"Using Alpha-Band Power to Evaluate Hearing Aid Directionality Based on Multistream Architecture.","authors":["Slugocki, C.","Kuk, F.","Korhonen, P."],"year":2024,"abstract_snippet":"PURPOSE The aim of the study was to evaluate whether behavioral speech-in-noise (SiN) benefits of hearing aid directivity based on multistream architecture (MSA) might result in reduced electroencephalographic activity in the alpha-band, as is often associated with task difficulty. METHOD A single-b","citation_count":3,"url":"https://www.semanticscholar.org/paper/0888112020982b556791b550e51c80c052258361","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.1501},{"id":"461f408f843ea0feb234882f56cc933b4bd7872b","title":"Traffic Flow Prediction Based on Spatio-Temporal Aggregated Graph Neural Networks","authors":["Wu, S.","Hu, Y."],"year":2025,"abstract_snippet":"Because of the increasingly complex spatio-temporal relationships among transportation networks, accurately predicting traffic flow has become a challenging task. Most existing frameworks primarily utilize given spatial adjacency graphs and other complex mechanisms to construct spatio-temporal infor","citation_count":2,"url":"https://www.semanticscholar.org/paper/461f408f843ea0feb234882f56cc933b4bd7872b","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2459},{"id":"49722b7a618160a23281787921d809b55465559a","title":"Dynamic Mechanical Properties and Deformation Mechanisms of Lightweight High-Strength TWIP Steel","authors":["Yang, J.","Liu, X.","Tang, Y.","Bai, S.","et al."],"year":2025,"abstract_snippet":"This study developed a twinning-induced plasticity (TWIP) steel characterized by lightweight, high strength, and high toughness. Tensile tests were conducted at strain rates ranging from 10−4 to 6500 s−1 using a universal testing machine and a Hopkinson bar to evaluate the material’s mechanical prop","citation_count":4,"url":"https://www.semanticscholar.org/paper/49722b7a618160a23281787921d809b55465559a","domain":"multi","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.2543},{"id":"4a88f0f077d9ed6095f666eb452d64e4b2e77a33","title":"Artificial neural network modeling of dye adsorption kinetics and thermodynamics with magnetic nanoparticle-activated carbon from Allium cepa peels","authors":["Deivayanai, V.","Karishma, S.","Thamarai, P.","Saravanan, A.","et al."],"year":2025,"abstract_snippet":"Industrial wastewater contamination with poisonous dyes such as Methylene Blue (MB) and Congo Red (CR) causes significant environmental and health risks. Classical removal methods are frequently expensive to execute inadequate, and yield additional waste. The current research proposes a sustainable ","citation_count":15,"url":"https://www.semanticscholar.org/paper/4a88f0f077d9ed6095f666eb452d64e4b2e77a33","domain":"multi","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.3007},{"id":"b018513a5c1a88e2446a0cf216ce9228e47326cc","title":"Sensitivity Analysis of the Johnson-Cook Model for Ti-6Al-4V in Aeroengine Applications","authors":["Beecher, C.","Sepúlveda, H.","Oñate, Á.","Habraken, A.","et al."],"year":2024,"abstract_snippet":"Titanium alloys, such as Ti-6Al-4V, are crucial for aeroengine structural integrity, especially during high-energy events like turbine blade-out scenarios. However, accurately predicting their behavior under such conditions requires the precise calibration of constitutive models. This study presents","citation_count":5,"url":"https://www.semanticscholar.org/paper/b018513a5c1a88e2446a0cf216ce9228e47326cc","domain":"mechanics","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.1586},{"id":"e70ea3eeeadfc32de81a727921ce091669284cd8","title":"An investigation on the jet formation and penetration characteristics of the CuCoCrFeNi high-entropy alloy liner","authors":["Li, R.","Wang, R.","Tian, Q.","Zhong, X.","et al."],"year":2024,"abstract_snippet":"This study performs a series of mechanical tests, quasi-static and dynamic, on CuCoCrFeNi high-entropy alloys (HEAs) using an experimental setup to explore the performance of Cu-based HEAs in shaped charges. It derives the parameters for the Johnson–Cook constitutive model through fitting. A static ","citation_count":5,"url":"https://www.semanticscholar.org/paper/e70ea3eeeadfc32de81a727921ce091669284cd8","domain":"multi","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.1586},{"id":"65928908dd4a3957f6a87a1ca2943ec18e701d6b","title":"Hearing loss prediction equation for Iranian truck drivers using neural network algorithm","authors":["Esmaeili, R.","Aghapanah, H.","Ghasemian, H.","Ashouri, M.","et al."],"year":2024,"abstract_snippet":"Background: Given the high prevalence of hearing loss among truck drivers, using artificial neural networks (ANNs) to predict and detect contributing factors early can aid managers significantly. Objective: This study aimed to predict hearing loss using an ANN algorithm and to evaluate the weight an","citation_count":2,"url":"https://www.semanticscholar.org/paper/65928908dd4a3957f6a87a1ca2943ec18e701d6b","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.1459},{"id":"a4359a9059dc1938204be79239227c92a0f49d87","title":"Exploring the load characteristics and structural responses of a high-speed vehicle entering water","authors":["Xu, L.","Wang, Z.","Lv, H."],"year":2024,"abstract_snippet":"The process of a trans-medium vehicle crossing from air into water is referred to as water entry. It involves the interplay of air, water, and the vehicle and is a non-stationary process. In this study, we use the coupled Eulerian–Lagrangian method, along with the constitutive Johnson–Cook model and","citation_count":11,"url":"https://www.semanticscholar.org/paper/a4359a9059dc1938204be79239227c92a0f49d87","domain":"mechanics","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.1838},{"id":"fc2dc6bd79b6852a9f296ec368fb7b8b7c00d6f4","title":"Artificial Neural Network and Response Surface Methodology for Predicting and Maximizing Biodiesel Production from Waste Oil with KI/CaO/Al2O3 Catalyst in a Fixed Bed Reactor.","authors":["Loryuenyong, V.","Rohing, S.","Singhanam, P.","Kamkang, H.","et al."],"year":2024,"abstract_snippet":"Biodiesel from waste oil is produced using heterogeneous catalyzed transesterification in a FBR. KI/CaO/Al2O3 catalyst was prepared through the processes of calcination and impregnation. The novel catalyst was analyzed with XRD, SEM, and EDX. The DoE method resulted in a total of 20 experimental run","citation_count":25,"url":"https://www.semanticscholar.org/paper/fc2dc6bd79b6852a9f296ec368fb7b8b7c00d6f4","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.2428},{"id":"31f098a9fe7227e235e9ac5584cdc43948305f95","title":"Optimization of fungal secondary metabolites production via response surface methodology coupled with multi-parameter optimized artificial neural network model.","authors":["Shu, H.","Chen, X.","Jiang, Q.","Wang, Y.","et al."],"year":2024,"abstract_snippet":"Filamentous fungi's secondary metabolites (SMs) possess significant application owing to their distinct structure and diverse bioactivities, yet their restricted yield levels often hinder further research and application. The study developed a response surface methodology-artificial neural network (","citation_count":12,"url":"https://www.semanticscholar.org/paper/31f098a9fe7227e235e9ac5584cdc43948305f95","domain":"multi","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.188},{"id":"836d5eb6d7fcc3eed001c77a6afd57caf93a5f52","title":"NeuroAMP: A Novel End-to-End General Purpose Deep Neural Amplifier for Personalized Hearing Aids","authors":["Ahmed, S.","Zezario, R.","Yuan, H.","Hussain, A.","et al."],"year":2025,"abstract_snippet":"The prevalence of hearing aids is increasing. However, optimizing their amplification remains challenging due to the complexity of integrating multiple components in traditional methods. To address this, we present NeuroAMP, a novel deep neural network for end-to-end, personalized amplification in h","citation_count":3,"url":"https://www.semanticscholar.org/paper/836d5eb6d7fcc3eed001c77a6afd57caf93a5f52","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.2501},{"id":"addc50329b74397b4d50b0bc8fafc0135a917627","title":"Mechanical Properties of 7075-T6 Aluminum Alloy in Electrically Assisted Forming","authors":["Dou, S.","Liu, Z.","Li, Z.","Shi, H.","et al."],"year":2025,"abstract_snippet":"The coupling effects of electrical pulse, temperature, strain rate, and strain on the flow behavior and plasticity of 7075-T6 aluminum alloy were investigated and characterized. The isothermal tensile test and electrically assisted isothermal tensile test were performed at the same temperature, and ","citation_count":5,"url":"https://www.semanticscholar.org/paper/addc50329b74397b4d50b0bc8fafc0135a917627","domain":"mechanics","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.2586},{"id":"95ed486f474966e2cf196eb9b84267bf1bf01939","title":"Non-Intrusive Speech Intelligibility Prediction for Hearing-Impaired Users Using Intermediate ASR Features and Human Memory Models","authors":["Mogridge, R.","Close, G.","Sutherland, R.","Hain, T.","et al."],"year":2024,"abstract_snippet":"Neural networks have been successfully used for non-intrusive speech intelligibility prediction. Recently, the use of feature representations sourced from intermediate layers of pre-trained self-supervised and weakly-supervised models has been found to be particularly useful for this task. This work","citation_count":23,"url":"https://www.semanticscholar.org/paper/95ed486f474966e2cf196eb9b84267bf1bf01939","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.2343},{"id":"f392514dff43863e81fe031ade4cd375bc312731","title":"Optimizing Ultrasonic-Assisted Extraction Process of Paralepista flaccida: A Comparative Study of Antioxidant, Anticholinesterase, and Antiproliferative Activities via Response Surface Methodology and Artificial Neural Network Modeling","authors":["Sevindik, M.","Gürgen, A.","Korkmaz, A.","Akata, I."],"year":2025,"abstract_snippet":"In this study, extraction conditions were optimized to maximize the biological activities of extracts obtained from Paralepista flaccida, an edible mushroom species. Extraction processes were carried out using an ultrasonically assisted system, and two different optimization approaches were used as ","citation_count":10,"url":"https://www.semanticscholar.org/paper/f392514dff43863e81fe031ade4cd375bc312731","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.2796},{"id":"537e663e116098d6b54903374bfe231cb9af1297","title":"A Novel Attention-Based Dynamic Multi-Graph Spatial-Temporal Graph Neural Network Model for Traffic Prediction","authors":["Diao, C.","Zhang, D.","Liang, W.","Jiang, M.","et al."],"year":2025,"abstract_snippet":"Traffic flow prediction is a non-negligible part of intelligent transportation and mobility. Unfortunately, the unique non-linearity and complex spatial-ST-correlation of transport flow data suggest considerable challenges in prediction. The dynamic interaction of multiple spatial relations greatly ","citation_count":6,"url":"https://www.semanticscholar.org/paper/537e663e116098d6b54903374bfe231cb9af1297","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2628},{"id":"8721e1cd369e4c1f648dc1a9abed4cbda30ef0de","title":"Breeding 5.0: Artificial intelligence (AI)-decoded germplasm for accelerated crop innovation.","authors":["Fu, J.","Zheng, S.","Fan, L.","Zheng, X.","et al."],"year":2025,"abstract_snippet":"Crop breeding technologies are vital for global food security. While traditional methods have improved yield, stress tolerance, and nutrition, rising challenges such as climate instability, land loss, and pest pressure now demand new solutions. This study introduces the Breeding 5.0 framework, drive","citation_count":13,"url":"https://www.semanticscholar.org/paper/8721e1cd369e4c1f648dc1a9abed4cbda30ef0de","domain":"mechanics","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.2922},{"id":"0ad62fbf4f1f5e9c1b3a98d6beb6b3df63f6928b","title":"Assessing climate and land use impacts on surface water yield using remote sensing and machine learning","authors":["Bojer, A.","Abshare, M.","Mesfin, F.","Al-Quraishi, A."],"year":2025,"abstract_snippet":"Climate and land use changes are critical factors affecting watershed water yields, with significant implications for water resources at both local and regional levels. This study examined the combined effects of temporal and spatial climate variability and land use/land cover (LULC) changes on surf","citation_count":14,"url":"https://www.semanticscholar.org/paper/0ad62fbf4f1f5e9c1b3a98d6beb6b3df63f6928b","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.2964},{"id":"bc13967adca437b12e800148ad2b2fffdb60b385","title":"Linear Phase FIR Filter Design for Digital Hearing Aids Using a Neural Network-Based Optimization","authors":["Chivapreecha, S.","Yospanya, P."],"year":2024,"abstract_snippet":"A neural network-based optimization for the design of linear phase digital filters used in digital hearing aid applications is presented in this paper. To achieve hearing loss compensation, a 53-tap finite impulse response (FIR) filter is utilized, and the weights of the trained network can be used ","citation_count":1,"url":"https://www.semanticscholar.org/paper/bc13967adca437b12e800148ad2b2fffdb60b385","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.1417},{"id":"73d9e3b1e59b9cad1c9440a6f3fd5b32ace8f414","title":"An hp Multigrid Approach for Tensor-Product Space-Time Finite Element Discretizations of the Stokes Equations","authors":["Margenberg, N.","Munch, P.","Bause, M."],"year":2025,"abstract_snippet":"We present a monolithic $hp$ space-time multigrid method for tensor-product space-time finite element discretizations of the Stokes equations. Geometric and polynomial coarsening of the space-time mesh is performed, and the entire algorithm is expressed through rigorous mathematical mappings. For th","citation_count":5,"url":"https://www.semanticscholar.org/paper/73d9e3b1e59b9cad1c9440a6f3fd5b32ace8f414","domain":"mechanics","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.2586},{"id":"1972ed5f04a8f91c1f0864faf3de4f29fb0c0006","title":"Structure-preserving parametric finite element methods for anisotropic surface diffusion flow with minimal deformation formulation","authors":["Guo, Y.","Li, M."],"year":2025,"abstract_snippet":"High mesh quality plays a crucial role in maintaining the stability of solutions in geometric flow problems. Duan and Li [Duan&Li, SIAM J. Sci. Comput. 46 (1) (2024) A587-A608] applied the minimal deformation (MD) formulation to propose an artificial tangential velocity determined by harmonic mappin","citation_count":4,"url":"https://www.semanticscholar.org/paper/1972ed5f04a8f91c1f0864faf3de4f29fb0c0006","domain":"mechanics","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.2543},{"id":"067f9e24f966fd59c03aa40e2bd439d6c740b394","title":"A Graph Neural Network-based Traffic Flow Prediction System with Enhanced Accuracy and Urban Efficiency","authors":["E.V.N.Jyothi, E."],"year":2024,"abstract_snippet":"This research culminates in a robust Traffic Flow Prediction System poised to redefine the landscape of Intelligent Transportation Systems (ITS). Our findings highlight the substantial promise of this system through a meticulously structured methodology spanning data generation, dynamic network cons","citation_count":11,"url":"https://www.semanticscholar.org/paper/067f9e24f966fd59c03aa40e2bd439d6c740b394","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.1838},{"id":"3cc9a7a5dfb0ab423df80b59b66d79798044a377","title":"A plastic correction algorithm for full-field elasto-plastic finite element simulations: critical assessment of predictive capabilities and improvement by machine learning","authors":["Palchoudhary, A.","Peter, S.","Maurel, V.","Ovalle, C.","et al."],"year":2024,"abstract_snippet":"This paper introduces a new local plastic correction algorithm that is aimed at accelerating elasto-plastic finite element (FE) simulations for structural problems exhibiting localised plasticity (around e.g. notches, geometrical defects). The proposed method belongs to the category of generalised m","citation_count":7,"url":"https://www.semanticscholar.org/paper/3cc9a7a5dfb0ab423df80b59b66d79798044a377","domain":"multi","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.167},{"id":"ab31e751468c225e16b02a4e3c02bb97c9091a41","title":"Multi-scale spatio-temporal graph neural network for urban traffic flow prediction","authors":["Chen, H.","Huang, J.","Lu, Y.","Huang, J."],"year":2025,"abstract_snippet":"The Urban traffic flow is affected by both internal supply and demand changes and external random disturbances, and during its continuous spatiotemporal propagation, these factors overlap with each other, presenting a highly non-linear and complex spatiotemporal pattern, which poses a huge challenge","citation_count":6,"url":"https://www.semanticscholar.org/paper/ab31e751468c225e16b02a4e3c02bb97c9091a41","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2628},{"id":"922bf135799d8ac2029c7af93359c20408f09cc5","title":"Survey on traffic flow prediction methods based on graph convolution neural network","authors":["Gao, Y.","Wang, X."],"year":2024,"abstract_snippet":"Graph convolution is a deep learning method for graph data, which can process unstructured traffic network data, which is very suitable for traffic flow prediction tasks. Researchers have introduced graph neural networks to model the graph structure and contextual information within transportation s","citation_count":2,"url":"https://www.semanticscholar.org/paper/922bf135799d8ac2029c7af93359c20408f09cc5","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.1459},{"id":"218087583bbb06eb9b8c475c0759e270e65cf9ab","title":"Nonlinear electro-elastic finite element analysis with neural network constitutive models","authors":["Klein, D.","Ortigosa, R.","Mart'inez-Frutos, J.","Weeger, O."],"year":2024,"abstract_snippet":"In the present work, the applicability of physics-augmented neural network (PANN) constitutive models for complex electro-elastic finite element analysis is demonstrated. For the investigations, PANN models for electro-elastic material behavior at finite deformations are calibrated to different synt","citation_count":14,"url":"https://www.semanticscholar.org/paper/218087583bbb06eb9b8c475c0759e270e65cf9ab","domain":"multi","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.1964},{"id":"5127ede0ba2160b29aaf52dc1805931fa93711ba","title":"Simulating flows in backward-facing step for various expansion ratios by finite element-lattice Boltzmann","authors":["Jokari, M.","Kazerooni, R.","Khalili, R.","Tavousi, E."],"year":2024,"abstract_snippet":"The development of fluid flow in a channel with constant width and a backward-facing step was investigated through numerical simulation. For the first time, by employing the finite element lattice Boltzmann method, a series of numerical calculations were performed to explore the flow behavior across","citation_count":5,"url":"https://www.semanticscholar.org/paper/5127ede0ba2160b29aaf52dc1805931fa93711ba","domain":"mechanics","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.1586},{"id":"4aa624856d1371d9b6a1eee186b5773028a83199","title":"LightST: A Simplifying Spatio-Temporal Graph Neural Network for Traffic Flow Forecasting","authors":["Hu, J.","Zheng, T.","Peng, L.","Teng, F.","et al."],"year":2025,"abstract_snippet":"Traffic flow forecasting task plays an essential role in intelligent transportation systems. Accurately capturing the intricate spatio-temporal dependencies in traffic network signals is the core of precise prediction. Recently, a paradigm that models spatio-temporal dependencies through graph neura","citation_count":8,"url":"https://www.semanticscholar.org/paper/4aa624856d1371d9b6a1eee186b5773028a83199","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2712},{"id":"1cbd2dd05db6d98897160aa3b623e3ba83a019cb","title":"Spatio-temporal envolutional graph neural network for traffic flow prediction in UAV-based urban traffic monitoring system","authors":["Ma, W.","Chu, Z.","Chen, H.","Li, M."],"year":2024,"abstract_snippet":"With the advancement of modern UAV technology, UAVs have become integral to creating traffic management monitoring systems. Additionally, UAV-based traffic monitoring systems can predict traffic flow by integrating machine learning methods. Specifically, traffic flow data contains both spatial and t","citation_count":18,"url":"https://www.semanticscholar.org/paper/1cbd2dd05db6d98897160aa3b623e3ba83a019cb","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2133},{"id":"48b36377bd16210768af4e83b41ff1c5f016e8a3","title":"Neural Network Optimization of Mechanical Properties of ABS-like Photopolymer Utilizing Stereolithography (SLA) 3D Printing","authors":["Kadauw, A."],"year":2025,"abstract_snippet":"The optimization of mechanical properties in acrylonitrile butadiene styrene-like (ABS-like) photopolymer utilizing neural network techniques presents a promising methodology for enhancing the performance and strength of components fabricated through stereolithography (SLA) 3D printing. This approac","citation_count":10,"url":"https://www.semanticscholar.org/paper/48b36377bd16210768af4e83b41ff1c5f016e8a3","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.2796},{"id":"9ece1911f815381041643e6d31a2920854702afa","title":"Evaluating Real-World Benefits of Hearing Aids With Deep Neural Network-Based Noise Reduction: An Ecological Momentary Assessment Study.","authors":["Christensen, J.","Whiston, H.","Lough, M.","Gil-Carvajal, J.","et al."],"year":2024,"abstract_snippet":"PURPOSE Noise reduction technologies in hearing aids provide benefits under controlled conditions. However, differences in their real-life effectiveness are not established. We propose that a deep neural network (DNN)-based noise reduction system trained on naturalistic sound environments will provi","citation_count":8,"url":"https://www.semanticscholar.org/paper/9ece1911f815381041643e6d31a2920854702afa","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.1712},{"id":"191bdf357f741f80ad487b695d35d9a43ed79f37","title":"Three-dimensional elastoplastic constitutive model for cement stone based on fractional flow rule","authors":["Liu, J.","Xu, Y.","Xiao, J.","Wang, C.","et al."],"year":2024,"abstract_snippet":"The strain paths of cement stone in the deviatoric and meridian planes under the constant Lode angle loading path (true triaxial stress state) are analyzed. The amount of volumetric and shear strains first increases and then decreases with the intermediate principal stress coefficient. Owing to the ","citation_count":3,"url":"https://www.semanticscholar.org/paper/191bdf357f741f80ad487b695d35d9a43ed79f37","domain":"mechanics","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.1501},{"id":"5a33227342f0447ad9b7f0cb5fa9e6ba1e93dfaa","title":"A Finite Operator Learning Technique for Mapping the Elastic Properties of Microstructures to Their Mechanical Deformations","authors":["Rezaei, S.","Faroughi, S.","Asgharzadeh, M.","Harandi, A.","et al."],"year":2024,"abstract_snippet":"To obtain fast solutions for governing physical equations in solid mechanics, we introduce a method that integrates the core ideas of the finite element method with physics‐informed neural networks and concept of neural operators. We propose directly utilizing the available discretized weak form in ","citation_count":17,"url":"https://www.semanticscholar.org/paper/5a33227342f0447ad9b7f0cb5fa9e6ba1e93dfaa","domain":"multi","connected_projects":["proj_6"],"is_bridge":false,"relevance_score":0.2091},{"id":"995006fdee5c27a860ad67563e5985dcccccf213","title":"dCoNNear: An Artifact-Free Neural Network Architecture for Closed-Loop Audio Signal Processing","authors":["Wen, C.","Torfs, G.","Verhulst, S."],"year":2025,"abstract_snippet":"Recent advances in deep neural networks (DNNs) have significantly improved various audio processing applications, including speech enhancement, synthesis, and hearing-aid algorithms. DNN-based closed-loop systems have gained popularity in these applications due to their robust performance and abilit","citation_count":4,"url":"https://www.semanticscholar.org/paper/995006fdee5c27a860ad67563e5985dcccccf213","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.2543},{"id":"86172f19d1ed5b85fd737e7adcf02c9a2a215d27","title":"Hearing-Loss Compensation Using Deep Neural Networks: A Framework and Results From a Listening Test","authors":["Leer, P.","Jensen, J.","Carney, L.","Tan, Z.","et al."],"year":2024,"abstract_snippet":"This article investigates the use of deep neural networks (DNNs) for hearing-loss compensation. Hearing loss is a prevalent issue affecting millions of people worldwide, and conventional hearing aids have limitations in providing satisfactory compensation. DNNs have shown remarkable performance in v","citation_count":7,"url":"https://www.semanticscholar.org/paper/86172f19d1ed5b85fd737e7adcf02c9a2a215d27","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.167},{"id":"f8af32bdce36cff042b174d177211a16ebc9fa96","title":"Deep Feedback Cancellation for Hearing Aids with Improved System Stability and Sound Quality","authors":["Lydaki, E.","Tan, Z.","Jensen, J.","Guo, M."],"year":2025,"abstract_snippet":"Acoustic feedback cancellation is an important task in audio processing systems, aiming to mitigate the effects of feedback loops on system stability and sound quality. State-of-the-art methods rely on adaptive filtering algorithms and face challenges in balancing between rapid convergence and low s","citation_count":2,"url":"https://www.semanticscholar.org/paper/f8af32bdce36cff042b174d177211a16ebc9fa96","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.2459},{"id":"6d4605b75bd168d980c8b8d4c6edc86c1e7eed67","title":"Step Length and Gait Speed Estimation Using a Hearing Aid Integrated Accelerometer: A Comparison of Different Algorithms","authors":["Seifer, A.","Küderle, A.","Dorschky, E.","Moradi, H.","et al."],"year":2024,"abstract_snippet":"Gait is an indicator of a person's health status and abnormal gait patterns are associated with a higher risk of falls, dementia, and mental health disorders. Wearable sensors facilitate long-term assessment of walking in the user's home environment. Earables, wearable sensors that are worn at the e","citation_count":11,"url":"https://www.semanticscholar.org/paper/6d4605b75bd168d980c8b8d4c6edc86c1e7eed67","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.1838},{"id":"144cdb1694814fd9aa81ff6da82f03647595c8f6","title":"MLatom Software Ecosystem for Surface Hopping Dynamics in Python with Quantum Mechanical and Machine Learning Methods.","authors":["Zhang, L.","Pios, S.","Martyka, M.","Ge, F.","et al."],"year":2024,"abstract_snippet":"We present an open-source MLatom@XACS software ecosystem for on-the-fly surface hopping nonadiabatic dynamics based on the Landau-Zener-Belyaev-Lebedev algorithm. The dynamics can be performed via Python API with a wide range of quantum mechanical (QM) and machine learning (ML) methods, including ab","citation_count":24,"url":"https://www.semanticscholar.org/paper/144cdb1694814fd9aa81ff6da82f03647595c8f6","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.2386},{"id":"417ddd95d560b687cd56cd9c605e3e96424cebf4","title":"Predictive Quality Analytics of Surface Roughness in Turning Operation Using Polynomial and Artificial Neural Network Models","authors":["Bober, P.","Zgodavová, K.","Čička, M.","Mihaliková, M.","et al."],"year":2024,"abstract_snippet":"The variability of the material properties of steel from different suppliers causes problems in achieving the required surface quality after turning. Therefore, the manufacturer needs to estimate the resulting quality before starting production, especially if it is an expensive, small-batch producti","citation_count":11,"url":"https://www.semanticscholar.org/paper/417ddd95d560b687cd56cd9c605e3e96424cebf4","domain":"ml","connected_projects":["proj_7"],"is_bridge":false,"relevance_score":0.1838},{"id":"53bbcfc366525a77f81c8b31896a5fd77fbb4ce1","title":"Mixed-Graph Neural Network for Traffic Flow Prediction by Capturing Dynamic Spatiotemporal Correlations","authors":["Su, X.","Li, P.","Cai, Z.","Guo, L.","et al."],"year":2025,"abstract_snippet":"Traffic flow prediction is a prominent research area in intelligent transportation systems, significantly contributing to urban traffic management and control. Existing methods or models for traffic flow prediction predominantly rely on a fixed-graph structure to capture spatial correlations within ","citation_count":3,"url":"https://www.semanticscholar.org/paper/53bbcfc366525a77f81c8b31896a5fd77fbb4ce1","domain":"ml","connected_projects":["proj_1"],"is_bridge":false,"relevance_score":0.2501},{"id":"05932b5a359259f35e4a4fa35fb44437b8091426","title":"Auditory attention decoding based on neural-network for binaural beamforming applications","authors":["Gueta, R.","Zion-Golumbic, E.","Goldberger, J.","Gannot, S."],"year":2025,"abstract_snippet":"Individuals have the remarkable ability to differentiate between speakers and focus on a particular speaker, even amidst complex acoustic environments with multiple speakers, background noise and reverberations. This selective auditory attention, often illustrated by the cocktail party problem, has ","citation_count":1,"url":"https://www.semanticscholar.org/paper/05932b5a359259f35e4a4fa35fb44437b8091426","domain":"ml","connected_projects":["proj_0"],"is_bridge":false,"relevance_score":0.2417}],"links":[{"source":"proj_0","target":"95ed486f474966e2cf196eb9b84267bf1bf01939"},{"source":"proj_0","target":"6d4605b75bd168d980c8b8d4c6edc86c1e7eed67"},{"source":"proj_0","target":"9ece1911f815381041643e6d31a2920854702afa"},{"source":"proj_0","target":"86172f19d1ed5b85fd737e7adcf02c9a2a215d27"},{"source":"proj_0","target":"5efd6cdb8d12554a0f1f5d4892ce629e2ce8248f"},{"source":"proj_0","target":"cccac9b1cbe5d454e89cef3d74a402a201de9afb"},{"source":"proj_0","target":"995006fdee5c27a860ad67563e5985dcccccf213"},{"source":"proj_0","target":"836d5eb6d7fcc3eed001c77a6afd57caf93a5f52"},{"source":"proj_0","target":"a40f49e895fb5b82ddef4db51b122d0b02304b19"},{"source":"proj_0","target":"0888112020982b556791b550e51c80c052258361"},{"source":"proj_0","target":"65928908dd4a3957f6a87a1ca2943ec18e701d6b"},{"source":"proj_0","target":"53dae2d46c6a5a368fc37aacf3733fa4a37f1d11"},{"source":"proj_0","target":"f8af32bdce36cff042b174d177211a16ebc9fa96"},{"source":"proj_0","target":"05932b5a359259f35e4a4fa35fb44437b8091426"},{"source":"proj_0","target":"bc13967adca437b12e800148ad2b2fffdb60b385"},{"source":"proj_1","target":"6ffd01617fb511d0314a5dfda862a77653054962"},{"source":"proj_1","target":"0bfeaf3e75de25afb70aa87726a2687a9bdf2f14"},{"source":"proj_1","target":"1cbd2dd05db6d98897160aa3b623e3ba83a019cb"},{"source":"proj_1","target":"a01740e18154f49a4e887683efa0ebbf6e357b91"},{"source":"proj_1","target":"067f9e24f966fd59c03aa40e2bd439d6c740b394"},{"source":"proj_1","target":"4aa624856d1371d9b6a1eee186b5773028a83199"},{"source":"proj_1","target":"ab31e751468c225e16b02a4e3c02bb97c9091a41"},{"source":"proj_1","target":"537e663e116098d6b54903374bfe231cb9af1297"},{"source":"proj_1","target":"40060ad3934a13184367785de01af16b4cff97cb"},{"source":"proj_1","target":"53bbcfc366525a77f81c8b31896a5fd77fbb4ce1"},{"source":"proj_1","target":"26d3a19e5874b8d146143aacba73ccf446db8830"},{"source":"proj_1","target":"b1eb3ab0010664084e811bfe48d2f6f5cd8ba8f6"},{"source":"proj_1","target":"922bf135799d8ac2029c7af93359c20408f09cc5"},{"source":"proj_1","target":"461f408f843ea0feb234882f56cc933b4bd7872b"},{"source":"proj_1","target":"bb0d5802a5b41281b0cf53e649ad64565b854db2"},{"source":"proj_6","target":"5a33227342f0447ad9b7f0cb5fa9e6ba1e93dfaa"},{"source":"proj_6","target":"b8f47add3f110e8c4c47f2e61f1fa3ca6d5781a0"},{"source":"proj_6","target":"a4359a9059dc1938204be79239227c92a0f49d87"},{"source":"proj_6","target":"1c33bf160603e9a4c009aeb7450b5125b05861d6"},{"source":"proj_6","target":"3cc9a7a5dfb0ab423df80b59b66d79798044a377"},{"source":"proj_6","target":"e8d4f3a98dc868002a8fe82ac376321120eb962b"},{"source":"proj_6","target":"b018513a5c1a88e2446a0cf216ce9228e47326cc"},{"source":"proj_6","target":"addc50329b74397b4d50b0bc8fafc0135a917627"},{"source":"proj_6","target":"e70ea3eeeadfc32de81a727921ce091669284cd8"},{"source":"proj_6","target":"f8a04899540fdaca335896b5409f1f8b44d32bc6"},{"source":"proj_6","target":"73d9e3b1e59b9cad1c9440a6f3fd5b32ace8f414"},{"source":"proj_6","target":"5127ede0ba2160b29aaf52dc1805931fa93711ba"},{"source":"proj_6","target":"49722b7a618160a23281787921d809b55465559a"},{"source":"proj_6","target":"1972ed5f04a8f91c1f0864faf3de4f29fb0c0006"},{"source":"proj_6","target":"191bdf357f741f80ad487b695d35d9a43ed79f37"},{"source":"proj_7","target":"f5959d225a0d8a80f67086115bd105869b6aa2a1"},{"source":"proj_7","target":"fc2dc6bd79b6852a9f296ec368fb7b8b7c00d6f4"},{"source":"proj_7","target":"144cdb1694814fd9aa81ff6da82f03647595c8f6"},{"source":"proj_7","target":"0b850b6b5cc7feb1bd9867109c2150510eeccb66"},{"source":"proj_7","target":"4a88f0f077d9ed6095f666eb452d64e4b2e77a33"},{"source":"proj_7","target":"0ad62fbf4f1f5e9c1b3a98d6beb6b3df63f6928b"},{"source":"proj_7","target":"47c33933ccbea8fc3bdbe50ad277545dd696c3b1"},{"source":"proj_7","target":"218087583bbb06eb9b8c475c0759e270e65cf9ab"},{"source":"proj_7","target":"8721e1cd369e4c1f648dc1a9abed4cbda30ef0de"},{"source":"proj_7","target":"ac940405d0766df0675a81160b16ac8cd496f89e"},{"source":"proj_7","target":"31f098a9fe7227e235e9ac5584cdc43948305f95"},{"source":"proj_7","target":"685672211d8e8ea4f27fe14adaa8ff52ebb6356c"},{"source":"proj_7","target":"417ddd95d560b687cd56cd9c605e3e96424cebf4"},{"source":"proj_7","target":"48b36377bd16210768af4e83b41ff1c5f016e8a3"},{"source":"proj_7","target":"f392514dff43863e81fe031ade4cd375bc312731"}],"generated_on":"2026-04-04"};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const DOMAIN_COLOR = {
+  ml:        "#58a6ff",
+  mechanics: "#f0883e",
+  materials: "#3fb950",
+  multi:     "#bc8cff",
+};
+
+function domainColor(d) {
+  return DOMAIN_COLOR[d] || "#8b949e";
+}
+
+function projectById(id) {
+  return DATA.projects.find(p => p.id === id);
+}
+
+function paperById(id) {
+  return DATA.papers.find(p => p.id === id);
+}
+
+function truncate(str, n) {
+  return str.length <= n ? str : str.slice(0, n - 1) + "\u2026";
+}
+
+function paperRadius(citationCount) {
+  return Math.min(22, Math.max(6, 6 + Math.sqrt(citationCount) * 0.8));
+}
+
+// ---------------------------------------------------------------------------
+// Filter state
+// ---------------------------------------------------------------------------
+
+const filterState = {
+  activeProjects: new Set(DATA.projects.map(p => p.id)),
+  yearMin: 2024,
+  yearMax: 2026,
+  activeDomains: new Set(),   // empty = all domains active
+  bridgeOnly: false,
+  selectedProjectId: null,    // single project highlight via node click
+};
+
+function paperPassesFilter(paper) {
+  // Year range
+  if (paper.year < filterState.yearMin || paper.year > filterState.yearMax) return false;
+
+  // Domain filter
+  if (filterState.activeDomains.size > 0 && !filterState.activeDomains.has(paper.domain)) return false;
+
+  // Bridge only
+  if (filterState.bridgeOnly && !paper.is_bridge) return false;
+
+  // Project filter: paper must be connected to at least one active project
+  const connectedActive = paper.connected_projects.some(pid => filterState.activeProjects.has(pid));
+  if (!connectedActive) return false;
+
+  // Selected project filter
+  if (filterState.selectedProjectId && !paper.connected_projects.includes(filterState.selectedProjectId)) return false;
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar: project checkboxes
+// ---------------------------------------------------------------------------
+
+function buildProjectCheckboxes() {
+  const container = document.getElementById("project-checkboxes");
+  DATA.projects.forEach(proj => {
+    const row = document.createElement("div");
+    row.className = "project-checkbox-row";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.id = `cb-${proj.id}`;
+    cb.checked = true;
+    cb.addEventListener("change", () => {
+      if (cb.checked) filterState.activeProjects.add(proj.id);
+      else filterState.activeProjects.delete(proj.id);
+      applyFilters();
+    });
+
+    const dot = document.createElement("span");
+    dot.className = "domain-dot";
+    dot.style.background = domainColor(proj.domain);
+
+    const lbl = document.createElement("label");
+    lbl.htmlFor = `cb-${proj.id}`;
+    lbl.textContent = proj.short_name;
+    lbl.title = proj.name;
+
+    row.appendChild(cb);
+    row.appendChild(dot);
+    row.appendChild(lbl);
+    container.appendChild(row);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Year range sliders
+// ---------------------------------------------------------------------------
+
+function initYearSliders() {
+  const minSlider = document.getElementById("year-min");
+  const maxSlider = document.getElementById("year-max");
+  const display = document.getElementById("year-display");
+
+  function updateDisplay() {
+    const lo = parseInt(minSlider.value);
+    const hi = parseInt(maxSlider.value);
+    display.textContent = `${lo} \u2013 ${hi}`;
+    filterState.yearMin = lo;
+    filterState.yearMax = hi;
+    applyFilters();
+  }
+
+  minSlider.addEventListener("input", () => {
+    if (parseInt(minSlider.value) > parseInt(maxSlider.value)) {
+      minSlider.value = maxSlider.value;
+    }
+    updateDisplay();
+  });
+
+  maxSlider.addEventListener("input", () => {
+    if (parseInt(maxSlider.value) < parseInt(minSlider.value)) {
+      maxSlider.value = minSlider.value;
+    }
+    updateDisplay();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Domain buttons
+// ---------------------------------------------------------------------------
+
+function initDomainButtons() {
+  document.querySelectorAll(".domain-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const domain = btn.dataset.domain;
+      if (filterState.activeDomains.has(domain)) {
+        filterState.activeDomains.delete(domain);
+        btn.className = "domain-btn";
+      } else {
+        filterState.activeDomains.add(domain);
+        btn.className = `domain-btn active-${domain}`;
+      }
+      applyFilters();
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Bridge toggle + reset
+// ---------------------------------------------------------------------------
+
+function initToggles() {
+  document.getElementById("bridge-only").addEventListener("change", e => {
+    filterState.bridgeOnly = e.target.checked;
+    applyFilters();
+  });
+
+  document.getElementById("reset-btn").addEventListener("click", () => {
+    filterState.activeProjects = new Set(DATA.projects.map(p => p.id));
+    filterState.yearMin = 2024;
+    filterState.yearMax = 2026;
+    filterState.activeDomains = new Set();
+    filterState.bridgeOnly = false;
+    filterState.selectedProjectId = null;
+
+    document.querySelectorAll(".project-checkbox-row input").forEach(cb => cb.checked = true);
+    document.getElementById("year-min").value = 2024;
+    document.getElementById("year-max").value = 2026;
+    document.getElementById("year-display").textContent = "2024 \u2013 2026";
+    document.querySelectorAll(".domain-btn").forEach(btn => btn.className = "domain-btn");
+    document.getElementById("bridge-only").checked = false;
+
+    applyFilters();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// D3 force graph
+// ---------------------------------------------------------------------------
+
+const svg = d3.select("#graph-svg");
+let width, height;
+let simulation;
+let svgGroup;
+
+// SVG defs for glow filter
+function addGlowFilter(svgEl) {
+  const defs = svgEl.append("defs");
+  const filter = defs.append("filter")
+    .attr("id", "glow")
+    .attr("x", "-50%")
+    .attr("y", "-50%")
+    .attr("width", "200%")
+    .attr("height", "200%");
+  filter.append("feGaussianBlur")
+    .attr("stdDeviation", "3")
+    .attr("result", "coloredBlur");
+  const feMerge = filter.append("feMerge");
+  feMerge.append("feMergeNode").attr("in", "coloredBlur");
+  feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+}
+
+function initGraph() {
+  const container = document.querySelector(".graph-area");
+  width = container.clientWidth;
+  height = container.clientHeight;
+
+  svg.attr("viewBox", [0, 0, width, height]);
+
+  addGlowFilter(svg);
+
+  const zoomBehavior = d3.zoom()
+    .scaleExtent([0.15, 4])
+    .on("zoom", (event) => {
+      svgGroup.attr("transform", event.transform);
+    });
+
+  svg.call(zoomBehavior);
+
+  svgGroup = svg.append("g").attr("class", "zoom-group");
+  svgGroup.append("g").attr("class", "links-layer");
+  svgGroup.append("g").attr("class", "nodes-layer");
+
+  simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(d => d.id).distance(120))
+    .force("charge", d3.forceManyBody().strength(d => d.type === "project" ? -300 : -80))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collide", d3.forceCollide().radius(d => (d.type === "project" ? 28 : paperRadius(d.citation_count || 0)) + 8))
+    .on("tick", ticked);
+}
+
+let currentNodes = [];
+let currentLinks = [];
+let linkSelection, nodeSelection;
+
+function buildGraphData() {
+  const visiblePapers = DATA.papers.filter(paperPassesFilter);
+  const visiblePaperIds = new Set(visiblePapers.map(p => p.id));
+
+  // Always include all active projects as nodes
+  const projectNodes = DATA.projects
+    .filter(p => filterState.activeProjects.has(p.id))
+    .map(p => ({ ...p, type: "project", node_radius: 28 }));
+
+  const paperNodes = visiblePapers.map(p => ({
+    ...p,
+    type: "paper",
+    node_radius: paperRadius(p.citation_count || 0),
+  }));
+
+  const nodes = [...projectNodes, ...paperNodes];
+
+  const links = DATA.links
+    .filter(l => {
+      const sourceActive = filterState.activeProjects.has(l.source.id || l.source);
+      const targetVisible = visiblePaperIds.has(l.target.id || l.target);
+      return sourceActive && targetVisible;
+    })
+    .map(l => ({ ...l }));
+
+  return { nodes, links };
+}
+
+function renderGraph() {
+  const { nodes, links } = buildGraphData();
+  currentNodes = nodes;
+  currentLinks = links;
+
+  const linksLayer = svgGroup.select(".links-layer");
+  const nodesLayer = svgGroup.select(".nodes-layer");
+
+  // Links
+  linkSelection = linksLayer.selectAll("line.link-line")
+    .data(links, d => `${d.source.id || d.source}-${d.target.id || d.target}`)
+    .join(
+      enter => enter.append("line")
+        .attr("class", "link-line")
+        .attr("stroke-width", 1)
+        .attr("stroke", d => {
+          const src = d.source.id || d.source;
+          const proj = projectById(src);
+          return proj ? domainColor(proj.domain) : "#8b949e";
+        }),
+      update => update,
+      exit => exit.remove()
+    );
+
+  // Nodes
+  const nodeGroups = nodesLayer.selectAll("g.node-group")
+    .data(nodes, d => d.id)
+    .join(
+      enter => {
+        const g = enter.append("g")
+          .attr("class", "node-group")
+          .call(d3.drag()
+            .on("start", dragStarted)
+            .on("drag", dragged)
+            .on("end", dragEnded)
+          );
+
+        // Glow ring for bridge papers
+        g.filter(d => d.type === "paper" && d.is_bridge)
+          .append("circle")
+          .attr("class", "bridge-ring")
+          .attr("r", d => d.node_radius + 4)
+          .attr("fill", "none")
+          .attr("stroke", "#39d353")
+          .attr("stroke-width", 1.5)
+          .attr("filter", "url(#glow)")
+          .attr("opacity", 0.6);
+
+        g.append("circle")
+          .attr("class", "node-circle")
+          .attr("r", d => d.node_radius)
+          .attr("fill", d => domainColor(d.domain))
+          .attr("stroke", d => d.type === "project" ? "#fff" : "transparent")
+          .attr("stroke-width", d => d.type === "project" ? 2 : 0);
+
+        // Labels for project nodes only
+        g.filter(d => d.type === "project")
+          .append("text")
+          .attr("class", "project-label")
+          .text(d => {
+            // Fit short_name into node; show abbreviated if needed
+            const words = d.short_name.split(" ");
+            return words.length <= 2 ? d.short_name : words.slice(0, 2).join("\n");
+          })
+          .call(wrapProjectLabel);
+
+        return g;
+      },
+      update => update,
+      exit => exit.remove()
+    );
+
+  nodeGroups
+    .select("circle.node-circle")
+    .attr("r", d => d.node_radius)
+    .attr("fill", d => domainColor(d.domain));
+
+  // Event handlers
+  nodeGroups
+    .on("mouseover", handleNodeMouseover)
+    .on("mouseout", handleNodeMouseout)
+    .on("click", handleNodeClick);
+
+  simulation.nodes(nodes);
+  simulation.force("link").links(links);
+  simulation.alpha(0.5).restart();
+
+  updateRankedList();
+  updateHeaderMeta();
+}
+
+function wrapProjectLabel(textSel) {
+  // D3 text wrapping for multi-word project labels inside a 28px radius circle
+  textSel.each(function(d) {
+    const el = d3.select(this);
+    el.text(null);
+    const words = (d.short_name || d.name).split(" ").slice(0, 4);
+    const lineHeight = 13;
+    const lines = [];
+    // Try to fit on 2 lines max
+    if (words.length <= 2) {
+      lines.push(words.join(" "));
+    } else if (words.length === 3) {
+      lines.push(words.slice(0, 2).join(" "));
+      lines.push(words[2]);
+    } else {
+      lines.push(words.slice(0, 2).join(" "));
+      lines.push(words.slice(2).join(" "));
+    }
+    const startY = -(lines.length - 1) * lineHeight / 2;
+    lines.forEach((line, i) => {
+      el.append("tspan")
+        .attr("x", 0)
+        .attr("dy", i === 0 ? `${startY}px` : `${lineHeight}px`)
+        .text(line);
+    });
+  });
+}
+
+function ticked() {
+  if (linkSelection) {
+    linkSelection
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+  }
+
+  svgGroup.selectAll("g.node-group")
+    .attr("transform", d => `translate(${d.x},${d.y})`);
+}
+
+function dragStarted(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(event, d) {
+  d.fx = event.x;
+  d.fy = event.y;
+}
+
+function dragEnded(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+// ---------------------------------------------------------------------------
+// Tooltip
+// ---------------------------------------------------------------------------
+
+const tooltip = document.getElementById("tooltip");
+
+function handleNodeMouseover(event, d) {
+  let html = "";
+  if (d.type === "project") {
+    html = `<strong>${d.name}</strong><br><span style="color:var(--text-muted);font-size:11px">Domain: ${d.domain}</span>`;
+  } else {
+    const citeStr = d.citation_count !== undefined ? `${d.citation_count} citations` : "";
+    html = `<strong>${truncate(d.title, 80)}</strong><br>` +
+      `<span style="color:var(--text-muted);font-size:11px">${d.year} \u2013 ${citeStr}</span>`;
+    if (d.is_bridge) {
+      html += `<br><span style="color:var(--accent-teal);font-size:10px">Bridge paper</span>`;
+    }
+  }
+  tooltip.innerHTML = html;
+  tooltip.style.opacity = "1";
+
+  // Highlight connected links
+  if (d.type === "paper") {
+    svgGroup.selectAll("line.link-line")
+      .attr("stroke-opacity", l => {
+        const tgt = l.target.id || l.target;
+        return tgt === d.id ? 1.0 : 0.1;
+      });
+  }
+
+  positionTooltip(event);
+}
+
+function handleNodeMouseout(event, d) {
+  tooltip.style.opacity = "0";
+  // Restore link opacity
+  svgGroup.selectAll("line.link-line").attr("stroke-opacity", 0.4);
+}
+
+function positionTooltip(event) {
+  const containerRect = document.querySelector(".graph-area").getBoundingClientRect();
+  let x = event.clientX - containerRect.left + 12;
+  let y = event.clientY - containerRect.top - 10;
+  const ttW = 260;
+  if (x + ttW > containerRect.width) x = x - ttW - 20;
+  tooltip.style.left = `${x}px`;
+  tooltip.style.top = `${y}px`;
+}
+
+svg.on("mousemove", (event) => {
+  if (tooltip.style.opacity !== "0") positionTooltip(event);
+});
+
+// ---------------------------------------------------------------------------
+// Node click: show detail + project filter
+// ---------------------------------------------------------------------------
+
+function handleNodeClick(event, d) {
+  event.stopPropagation();
+
+  if (d.type === "project") {
+    if (filterState.selectedProjectId === d.id) {
+      filterState.selectedProjectId = null;
+    } else {
+      filterState.selectedProjectId = d.id;
+    }
+    applyFilters();
+    return;
+  }
+
+  // Paper node
+  showDetailPanel(d);
+  highlightPaperInList(d.id);
+}
+
+svg.on("click", () => {
+  if (filterState.selectedProjectId) {
+    filterState.selectedProjectId = null;
+    applyFilters();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Detail panel
+// ---------------------------------------------------------------------------
+
+function showDetailPanel(paper) {
+  const panel = document.getElementById("detail-panel");
+  panel.classList.add("visible");
+
+  document.getElementById("detail-title").textContent = paper.title;
+  document.getElementById("detail-authors").textContent = (paper.authors || []).join(", ");
+
+  const metaEl = document.getElementById("detail-meta");
+  metaEl.innerHTML = `
+    <span class="year-badge">${paper.year}</span>
+    <span class="cite-badge">${paper.citation_count} citations</span>
+    ${paper.is_bridge ? '<span class="bridge-tag">Bridge</span>' : ""}
+    <span style="color:var(--text-muted);font-size:11px">Relevance: ${paper.relevance_score.toFixed(2)}</span>
+  `;
+
+  document.getElementById("detail-abstract").textContent = paper.abstract_snippet
+    ? paper.abstract_snippet + (paper.abstract_snippet.length >= 300 ? "\u2026" : "")
+    : "No abstract available.";
+
+  const footerEl = document.getElementById("detail-footer");
+  let footerHtml = `<a id="detail-link" href="${paper.url}" target="_blank" rel="noopener">View on Semantic Scholar \u2192</a>`;
+  (paper.connected_projects || []).forEach(pid => {
+    const proj = projectById(pid);
+    if (proj) {
+      footerHtml += `<span class="detail-proj-chip" style="color:${domainColor(proj.domain)};border-color:${domainColor(proj.domain)}">${proj.short_name}</span>`;
+    }
+  });
+  footerEl.innerHTML = footerHtml;
+}
+
+document.getElementById("detail-close").addEventListener("click", () => {
+  document.getElementById("detail-panel").classList.remove("visible");
+});
+
+// ---------------------------------------------------------------------------
+// Right sidebar: ranked paper list
+// ---------------------------------------------------------------------------
+
+function updateRankedList() {
+  const visiblePapers = DATA.papers
+    .filter(paperPassesFilter)
+    .sort((a, b) => b.relevance_score - a.relevance_score);
+
+  document.getElementById("paper-count-badge").textContent = visiblePapers.length;
+
+  const container = document.getElementById("paper-list");
+  container.innerHTML = "";
+
+  visiblePapers.forEach(paper => {
+    const item = document.createElement("div");
+    item.className = "paper-item";
+    item.dataset.paperId = paper.id;
+
+    const titleEl = document.createElement("div");
+    titleEl.className = "paper-item-title";
+    titleEl.textContent = paper.title;
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "paper-item-meta";
+
+    const yearBadge = document.createElement("span");
+    yearBadge.className = "year-badge";
+    yearBadge.textContent = paper.year;
+
+    const citeBadge = document.createElement("span");
+    citeBadge.className = "cite-badge";
+    citeBadge.textContent = `${paper.citation_count} cit.`;
+
+    metaEl.appendChild(yearBadge);
+    metaEl.appendChild(citeBadge);
+
+    if (paper.is_bridge) {
+      const bridgeTag = document.createElement("span");
+      bridgeTag.className = "bridge-tag";
+      bridgeTag.textContent = "Bridge";
+      metaEl.appendChild(bridgeTag);
+    }
+
+    (paper.connected_projects || []).forEach(pid => {
+      const proj = projectById(pid);
+      if (!proj) return;
+      const tag = document.createElement("span");
+      tag.className = "proj-tag";
+      tag.style.color = domainColor(proj.domain);
+      tag.style.borderColor = domainColor(proj.domain);
+      tag.style.border = `1px solid ${domainColor(proj.domain)}`;
+      tag.textContent = proj.short_name.split(" ")[0];
+      metaEl.appendChild(tag);
+    });
+
+    const relWrap = document.createElement("div");
+    relWrap.className = "relevance-bar-wrap";
+
+    const relBg = document.createElement("div");
+    relBg.className = "relevance-bar-bg";
+    const relFill = document.createElement("div");
+    relFill.className = "relevance-bar-fill";
+    relFill.style.width = `${Math.round(paper.relevance_score * 100)}%`;
+    relFill.style.background = domainColor(paper.domain);
+    relBg.appendChild(relFill);
+
+    const relVal = document.createElement("div");
+    relVal.className = "relevance-val";
+    relVal.textContent = paper.relevance_score.toFixed(2);
+
+    relWrap.appendChild(relBg);
+    relWrap.appendChild(relVal);
+
+    item.appendChild(titleEl);
+    item.appendChild(metaEl);
+    item.appendChild(relWrap);
+
+    item.addEventListener("click", () => {
+      showDetailPanel(paper);
+      highlightPaperInList(paper.id);
+      centerOnPaperNode(paper.id);
+    });
+
+    container.appendChild(item);
+  });
+}
+
+function highlightPaperInList(paperId) {
+  document.querySelectorAll(".paper-item").forEach(el => {
+    el.classList.toggle("highlighted", el.dataset.paperId === paperId);
+  });
+  const highlighted = document.querySelector(".paper-item.highlighted");
+  if (highlighted) highlighted.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function centerOnPaperNode(paperId) {
+  const node = currentNodes.find(n => n.id === paperId);
+  if (!node || node.x === undefined) return;
+
+  const container = document.querySelector(".graph-area");
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+
+  const transform = d3.zoomTransform(svg.node());
+  const newTransform = d3.zoomIdentity
+    .translate(w / 2 - transform.k * node.x, h / 2 - transform.k * node.y)
+    .scale(transform.k);
+
+  svg.transition().duration(600).call(
+    d3.zoom().transform,
+    newTransform
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Header meta
+// ---------------------------------------------------------------------------
+
+function updateHeaderMeta() {
+  const visiblePapers = DATA.papers.filter(paperPassesFilter);
+  const bridgeCount = visiblePapers.filter(p => p.is_bridge).length;
+  document.getElementById("header-meta").textContent =
+    `${visiblePapers.length} papers \u2013 ${bridgeCount} bridge \u2013 generated ${DATA.generated_on}`;
+}
+
+// ---------------------------------------------------------------------------
+// Apply filters
+// ---------------------------------------------------------------------------
+
+function applyFilters() {
+  renderGraph();
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+
+function init() {
+  buildProjectCheckboxes();
+  initYearSliders();
+  initDomainButtons();
+  initToggles();
+  initGraph();
+  renderGraph();
+}
+
+window.addEventListener("load", init);
+window.addEventListener("resize", () => {
+  const container = document.querySelector(".graph-area");
+  width = container.clientWidth;
+  height = container.clientHeight;
+  svg.attr("viewBox", [0, 0, width, height]);
+  if (simulation) {
+    simulation.force("center", d3.forceCenter(width / 2, height / 2));
+    simulation.alpha(0.3).restart();
+  }
+});
+</script>
+</body>
+</html>

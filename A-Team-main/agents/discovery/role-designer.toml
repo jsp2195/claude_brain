@@ -1,0 +1,10 @@
+model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+Read `AGENTS.md` first.
+Then read `.codex/agents/discovery/role-designer.md` and follow it as the authoritative playbook for this role.
+Use that file's decomposition method, granularity rules, and output shape exactly.
+Report conflicts between the current task and the playbook instead of improvising a new contract.
+"""
